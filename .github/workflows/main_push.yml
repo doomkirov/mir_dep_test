@@ -1,0 +1,71 @@
+name: main_push.yml
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Clone project to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script: |
+            mkdir -p /app
+            cd /app
+
+            if [ ! -d "mirror/.git" ]; then
+              rm -rf mirror
+              git clone git@github.com:doomkirov/mir_dep_test.git mirror
+            else
+              cd mirror
+              git fetch origin main
+              git reset --hard origin/main
+            fi
+
+      - name: Check .env file on server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            if [ ! -f /app/mirror/app/.env ]; then
+              echo "ERROR: .env not found in /app/mirror/app!"
+              exit 1
+            else
+              echo ".env file exists — proceeding with deploy."
+            fi
+
+      - name: Ensure docker & compose exist
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            which docker || (curl -fsSL https://get.docker.com | sh)
+            which docker-compose || echo "Using docker compose plugin"
+
+      - name: Run docker compose on server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /app/mirror
+            docker compose down || true
+            docker compose up -d --build

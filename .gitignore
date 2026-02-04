@@ -1,0 +1,14 @@
+.venv
+.idea
+__pycache__
+.git
+
+*.egg-info
+mir_dep_test.egg-info
+
+app/test.py
+app/.env
+
+logs/
+logs/*
+*.log
